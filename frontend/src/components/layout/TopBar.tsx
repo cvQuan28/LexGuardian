@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Plus, X, Scale } from "lucide-react";
+import { Plus, X, Scale, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useAuthStore } from "@/stores/authStore";
+import { useThemeStore } from "@/stores/themeStore";
 import { useCreateWorkspace } from "@/hooks/useWorkspaces";
 
 interface TopBarProps {
@@ -13,6 +14,7 @@ export function TopBar({ className }: TopBarProps) {
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
   const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
   const user = useAuthStore((s) => s.user);
+  const { isDark, toggle: toggleDark } = useThemeStore();
   const { mutateAsync: createWorkspace, isPending } = useCreateWorkspace();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -55,8 +57,18 @@ export function TopBar({ className }: TopBarProps) {
           )}
         </div>
 
-        {/* Right: actions + avatar */}
+        {/* Right: actions + dark mode + avatar */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Dark mode toggle */}
+          <button
+            onClick={toggleDark}
+            className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            aria-label={isDark ? "Chuyển sang sáng" : "Chuyển sang tối"}
+            title={isDark ? "Chế độ sáng" : "Chế độ tối"}
+          >
+            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+
           <button
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 transition-colors"
@@ -87,7 +99,7 @@ export function TopBar({ className }: TopBarProps) {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Brief name
+                  Tên Brief
                 </label>
                 <input
                   type="text"
@@ -104,14 +116,14 @@ export function TopBar({ className }: TopBarProps) {
                   onClick={() => { setShowCreateModal(false); setNewName(""); }}
                   className="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
                 >
-                  Cancel
+                  Hủy
                 </button>
                 <button
                   onClick={handleCreate}
                   disabled={!newName.trim() || isPending}
                   className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isPending ? "Creating..." : "Create Brief"}
+                  {isPending ? "Đang tạo..." : "Tạo Brief"}
                 </button>
               </div>
             </div>

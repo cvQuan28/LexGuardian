@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { Shield, FileText, ChevronRight, RefreshCw, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RiskReport } from "@/components/analyze/RiskReport";
@@ -220,6 +221,8 @@ export function AnalyzePage() {
           document_name: doc.original_filename || doc.filename,
         });
         setReport(result);
+        const highCount = result.risk_counts?.high ?? result.risks.filter(r => r.risk_level.toLowerCase() === "high" || r.risk_level.toLowerCase() === "critical").length;
+        toast.success(`Phân tích hoàn tất. ${result.risks.length} rủi ro phát hiện${highCount > 0 ? ` (${highCount} nghiêm trọng)` : ""}.`);
       } catch (err) {
         setAnalyzeError(
           err instanceof Error ? err.message : "Phân tích thất bại. Vui lòng thử lại."

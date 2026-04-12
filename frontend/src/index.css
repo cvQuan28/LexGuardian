@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Enable class-based dark mode: .dark on <html> activates dark: variants */
+@custom-variant dark (&:is(.dark *));
+
 @theme {
   --color-surface-lowest: #FAFAFA;
   --color-surface-low: #F4F4F5;
@@ -56,3 +59,34 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Fade-in animation for step transitions */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.3s ease forwards;
+}
+
+/* Dark mode overrides */
+.dark body {
+  background-color: #0f0f17;
+  color: #e2e2e8;
+}
+.dark {
+  color-scheme: dark;
+}
+.dark .bg-white { background-color: #1a1a2a !important; }
+.dark .bg-gray-50 { background-color: #13131e !important; }
+.dark .bg-surface-lowest { background-color: #0f0f17 !important; }
+.dark .border-gray-100 { border-color: #2a2a3a !important; }
+.dark .border-gray-200 { border-color: #2a2a3a !important; }
+.dark .text-gray-900 { color: #f0f0f8 !important; }
+.dark .text-gray-800 { color: #e2e2ee !important; }
+.dark .text-gray-700 { color: #c8c8d8 !important; }
+.dark .text-gray-600 { color: #a0a0b8 !important; }
+.dark .text-gray-500 { color: #8080a0 !important; }
+.dark .text-gray-400 { color: #6060808 !important; }
+.dark .shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important; }
+.dark .shadow-ambient { box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2) !important; }
