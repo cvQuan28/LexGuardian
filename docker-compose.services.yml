@@ -1,0 +1,23 @@
+# NexusRAG — Dev services (PostgreSQL with pgvector)
+# Usage: docker compose -f docker-compose.services.yml up -d
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: nexusrag-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nexusrag
+    ports:
+      - "5433:5432"
+    volumes:
+      - nexusrag_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  nexusrag_postgres_data:

@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+*.egg
+.pytest_cache/
+.ruff_cache/
+system.log
+*.log
+
+# Node
+node_modules/
+dist/
+.pnpm-store/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Data & models
+backend/data/
+*.bin
+*.safetensors
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
