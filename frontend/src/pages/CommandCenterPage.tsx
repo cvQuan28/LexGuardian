@@ -1,11 +1,13 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Scale, FileText, Plus, X, Loader2 } from "lucide-react";
+import { Scale, FileText, Plus, X, Loader2, Shield, BookOpen, Library } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CommandBar } from "@/components/command/CommandBar";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { useWorkspaces, useCreateWorkspace } from "@/hooks/useWorkspaces";
 import { useDetectIntent } from "@/hooks/useCommand";
+import { useUploadDocument } from "@/hooks/useDocuments";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { formatDate } from "@/lib/utils";
 import type { KnowledgeBase } from "@/types";
@@ -28,6 +30,14 @@ export function CommandCenterPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newBriefName, setNewBriefName] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // File intent modal state
+  const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+
+  // Upload hook — only active when we have a workspace
+  const wsForUpload = activeWorkspace ?? workspaces?.[0];
+  const uploadDocument = useUploadDocument(wsForUpload?.id ?? 0);
 
   const handleBriefClick = useCallback((ws: KnowledgeBase) => {
     setActiveWorkspace(ws);
@@ -85,10 +95,43 @@ export function CommandCenterPage() {
 
   const handleFileDrop = useCallback((files: File[]) => {
     const ws = activeWorkspace ?? workspaces?.[0];
-    if (ws && files.length > 0) {
-      navigate(`/library/${ws.id}`);
+    if (!ws) {
+      setShowCreateModal(true);
+      return;
     }
-  }, [activeWorkspace, workspaces, navigate]);
+    if (files.length > 0) {
+      setPendingFiles(files);
+    }
+  }, [activeWorkspace, workspaces]);
+
+  const handleFileIntentChoice = useCallback(async (choice: "analyze" | "ask" | "library") => {
+    const ws = activeWorkspace ?? workspaces?.[0];
+    if (!ws || !pendingFiles?.length) return;
+
+    const file = pendingFiles[0];
+    setPendingFiles(null);
+
+    if (choice === "library") {
+      navigate(`/library/${ws.id}`);
+      return;
+    }
+
+    // Upload then navigate
+    setUploadingFile(true);
+    try {
+      const doc = await uploadDocument.mutateAsync(file);
+      toast.success("Đã tải lên thành công. Đang xử lý...");
+      if (choice === "analyze") {
+        navigate(`/analyze/${ws.id}?documentId=${doc.id}`);
+      } else {
+        navigate(`/ask/${ws.id}?q=${encodeURIComponent(`Tóm tắt nghĩa vụ trong ${doc.original_filename || file.name}`)}`);
+      }
+    } catch {
+      toast.error("Không thể tải lên tài liệu. Vui lòng thử lại.");
+    } finally {
+      setUploadingFile(false);
+    }
+  }, [activeWorkspace, workspaces, pendingFiles, uploadDocument, navigate]);
 
   const hasWorkspaces = workspaces && workspaces.length > 0;
 
@@ -221,6 +264,74 @@ export function CommandCenterPage() {
       {workspacesLoading && (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-5 h-5 animate-spin text-gray-300" />
+        </div>
+      )}
+
+      {/* File intent modal */}
+      {pendingFiles && pendingFiles.length > 0 && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-base font-semibold text-gray-900">
+                Bạn muốn làm gì với hợp đồng này?
+              </h2>
+              <button
+                onClick={() => setPendingFiles(null)}
+                className="p-1 rounded-md text-gray-400 hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mb-5 truncate">
+              {pendingFiles[0].name}
+            </p>
+
+            {uploadingFile ? (
+              <div className="flex items-center justify-center py-6 gap-2 text-sm text-gray-500">
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                Đang tải lên...
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <button
+                  onClick={() => handleFileIntentChoice("analyze")}
+                  className="w-full flex items-start gap-3 px-4 py-3.5 rounded-xl border border-gray-100 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left"
+                >
+                  <Shield className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">Phân tích Rủi ro</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Phát hiện điều khoản bất lợi và rủi ro pháp lý
+                    </p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleFileIntentChoice("ask")}
+                  className="w-full flex items-start gap-3 px-4 py-3.5 rounded-xl border border-gray-100 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left"
+                >
+                  <BookOpen className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">Tóm tắt Nghĩa vụ</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Trích xuất nghĩa vụ các bên từ hợp đồng
+                    </p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleFileIntentChoice("library")}
+                  className="w-full flex items-start gap-3 px-4 py-3.5 rounded-xl border border-gray-100 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left"
+                >
+                  <Library className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">Thêm vào Thư viện</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Lưu tài liệu để tra cứu và hỏi đáp sau
+                    </p>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

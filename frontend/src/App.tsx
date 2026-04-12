@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { LoginPage } from "@/pages/LoginPage";
 import { CommandCenterPage } from "@/pages/CommandCenterPage";
 import { AskPage } from "@/pages/AskPage";
+import { AnalyzePage } from "@/pages/AnalyzePage";
 import { LibraryPage } from "@/pages/LibraryPage";
 
 const queryClient = new QueryClient({
@@ -45,6 +46,16 @@ export default function App() {
               <AuthGate>
                 <AppShell>
                   <AskPage />
+                </AppShell>
+              </AuthGate>
+            }
+          />
+          <Route
+            path="/analyze/:workspaceId"
+            element={
+              <AuthGate>
+                <AppShell>
+                  <AnalyzePage />
                 </AppShell>
               </AuthGate>
             }

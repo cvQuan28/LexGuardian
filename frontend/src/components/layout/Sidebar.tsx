@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
-import { Scale, Home, MessageSquare, Library, ChevronDown, LogOut, Plus } from "lucide-react";
+import { Scale, Home, MessageSquare, Library, ChevronDown, LogOut, Plus, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspaces } from "@/hooks/useWorkspaces";
 import { useLogout } from "@/hooks/useAuth";
@@ -23,6 +23,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Command Center", icon: Home, to: "/" },
   { label: "Ask", icon: MessageSquare, to: "/ask", matchPrefix: "/ask" },
+  { label: "Analyze", icon: Shield, to: "/analyze", matchPrefix: "/analyze" },
   { label: "Library", icon: Library, to: "/library", matchPrefix: "/library" },
 ];
 
@@ -81,6 +82,8 @@ export function Sidebar({ onWorkspaceSelect, collapsed = false }: SidebarProps) 
               to={
                 item.matchPrefix === "/ask" && activeWorkspace
                   ? `/ask/${activeWorkspace.id}`
+                  : item.matchPrefix === "/analyze" && activeWorkspace
+                  ? `/analyze/${activeWorkspace.id}`
                   : item.matchPrefix === "/library" && activeWorkspace
                   ? `/library/${activeWorkspace.id}`
                   : item.to

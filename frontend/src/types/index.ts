@@ -179,13 +179,28 @@ export interface ProjectAnalytics {
 }
 
 // Legal Analysis Types
+export type RiskSeverity = "high" | "medium" | "low" | "HIGH" | "MEDIUM" | "LOW" | "CRITICAL";
+
 export interface LegalRiskItem {
   clause_id: string;
   clause_reference: string;
-  risk_level: string;
+  risk_level: RiskSeverity;
   risk_type: string;
   description: string;
   recommendation?: string;
+}
+
+export interface RiskCounts {
+  high: number;
+  medium: number;
+  low: number;
+  total: number;
+}
+
+export interface ReviewAction {
+  label: string;
+  description: string;
+  priority: string;
 }
 
 export interface ContractRiskReport {
@@ -197,6 +212,9 @@ export interface ContractRiskReport {
   governing_law: string;
   summary: string;
   missing_clauses: string[];
+  risk_counts?: RiskCounts;
+  top_issues?: string[];
+  recommended_actions?: ReviewAction[];
 }
 
 // Chat Types
