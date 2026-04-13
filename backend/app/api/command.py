@@ -61,7 +61,7 @@ async def detect_intent(
     if body.document_id:
         intent = "ASK_DOCUMENT"
         suggested_action = "query_document"
-    elif result.domain == "legal" and result.confidence >= 0.7:
+    elif result.domain == "legal":
         validity_keywords = ["còn hiệu lực", "hết hiệu lực", "expired", "still valid", "in force"]
         if any(kw in body.input.lower() for kw in validity_keywords):
             intent = "CHECK_VALIDITY"
@@ -69,9 +69,6 @@ async def detect_intent(
         else:
             intent = "ASK_LAW"
             suggested_action = "live_search"
-    elif result.domain == "legal":
-        intent = "ASK_DOCUMENT"
-        suggested_action = "query_workspace"
     else:
         intent = "GENERAL"
         suggested_action = "general_chat"

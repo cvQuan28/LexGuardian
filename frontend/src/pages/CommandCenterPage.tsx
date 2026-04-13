@@ -94,10 +94,12 @@ export function CommandCenterPage() {
       const intent = result.intent;
       if (intent === "ANALYZE_RISK") {
         handleNavigateWithMode("", "analyze");
-      } else if (intent === "ASK_LAW" || intent === "CHECK_VALIDITY") {
-        handleNavigateWithMode(text, "legal");
-      } else {
+      } else if (intent === "ASK_DOCUMENT") {
+        // Only explicitly route to document mode when document-scoped
         handleNavigateWithMode(text, "document");
+      } else {
+        // ASK_LAW, CHECK_VALIDITY, GENERAL → all go to legal consultation
+        handleNavigateWithMode(text, "legal");
       }
     } catch {
       handleNavigateWithMode(text, "legal"); // fallback to legal on error

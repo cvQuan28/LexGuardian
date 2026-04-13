@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 # High-signal legal terms — 2 points each
 _LEGAL_KEYWORDS_HIGH = {
-    # Vietnamese
+    # Vietnamese — contract terms
     "hợp đồng", "điều khoản", "điều ", "khoản ", "điểm ",
     "bên a", "bên b", "bên mua", "bên bán", "bên thuê", "bên cho thuê",
     "nghĩa vụ", "quyền và nghĩa vụ", "phạt vi phạm", "bồi thường",
@@ -42,22 +42,46 @@ _LEGAL_KEYWORDS_HIGH = {
     "trọng tài", "tòa án", "pháp luật việt nam", "luật thương mại",
     "thuế gtgt", "thuế vat", "phụ lục", "biên bản nghiệm thu",
     "bảo hành", "bảo lãnh thực hiện", "giải quyết tranh chấp",
+    # Vietnamese — legal consultation (laws, decrees, regulations)
+    "bộ luật", "bộ luật dân sự", "bộ luật hình sự", "bộ luật lao động",
+    "luật doanh nghiệp", "luật đất đai", "luật lao động", "luật dân sự",
+    "luật hình sự", "luật hôn nhân", "luật thuế", "luật đầu tư",
+    "luật xây dựng", "luật nhà ở", "luật kinh doanh", "luật bảo hiểm",
+    "nghị định", "thông tư", "quyết định", "văn bản pháp luật",
+    "quy định pháp luật", "pháp luật quy định", "theo quy định",
+    "quy phạm pháp luật", "hệ thống pháp luật", "văn bản quy phạm",
+    "xử phạt vi phạm", "xử phạt hành chính", "vi phạm hành chính",
+    "tội phạm", "hình phạt", "khởi tố", "truy tố", "xét xử",
+    "thừa kế", "ly hôn", "quyền nuôi con", "cấp dưỡng",
+    "tranh chấp đất đai", "quyền sử dụng đất", "giấy chứng nhận",
     # English
     "contract", "clause", "obligation", "penalty", "breach",
     "indemnify", "governing law", "force majeure", "arbitration",
     "liquidated damages", "termination", "warranties", "representations",
+    "labor law", "civil code", "criminal law", "decree", "regulation",
+    "legal provision", "statutory", "compliance", "legislation",
 }
 
 # Medium-signal legal terms — 1 point each
 _LEGAL_KEYWORDS_MED = {
-    # Vietnamese
+    # Vietnamese — contract
     "ký kết", "hiệu lực", "thực hiện", "vi phạm", "tranh chấp",
     "giao hàng", "nghiệm thu", "bàn giao", "hoàn thành", "tiến độ",
     "cam kết", "đảm bảo", "tài sản", "sở hữu", "chuyển nhượng",
     "lãi suất", "phạt chậm", "nộp phạt", "đặt cọc", "ký quỹ",
+    # Vietnamese — legal consultation
+    "pháp lý", "pháp luật", "quy định", "luật", "điều luật",
+    "tư vấn luật", "tư vấn pháp lý", "tra cứu luật", "hiểu luật",
+    "còn hiệu lực", "hết hiệu lực", "có hiệu lực", "áp dụng",
+    "quyền lợi", "quyền hạn", "trách nhiệm", "nghĩa vụ pháp lý",
+    "mức phạt", "mức xử phạt", "bị phạt", "phạt tiền",
+    "thủ tục", "hồ sơ", "giấy phép", "đăng ký", "chứng nhận",
+    "người lao động", "người sử dụng lao động", "tiền lương",
+    "bảo hiểm xã hội", "bảo hiểm y tế", "bảo hiểm thất nghiệp",
     # English
     "shall", "must", "liable", "warranty", "indemnification",
     "damages", "dispute", "jurisdiction", "payment", "delivery",
+    "rights", "duties", "legal", "law", "statute", "code",
 }
 
 # Clause-number patterns in queries — very strong legal signal
@@ -79,12 +103,20 @@ _LEGAL_NUMBER_PATTERNS = [
 
 # Legal question words
 _LEGAL_QUESTION_STARTERS = {
+    # Contract questions
     "giá trị hợp đồng", "tổng giá trị", "hợp đồng có giá",
     "bên nào phải", "ai phải", "nghĩa vụ của", "quyền của",
     "mức phạt", "tiền phạt", "hình thức phạt", "điều kiện chấm dứt",
     "khi nào được", "nếu vi phạm", "trường hợp",
     "what is the contract value", "what are the obligations",
     "what happens if", "penalty for", "termination clause",
+    # Legal consultation questions
+    "luật quy định", "quy định về", "theo pháp luật", "pháp luật quy định",
+    "mức xử phạt", "bị xử phạt", "xử phạt như thế nào",
+    "có được phép", "được phép không", "hợp pháp không",
+    "thủ tục như thế nào", "cần phải làm gì", "cần giấy tờ gì",
+    "tư vấn về", "cho tôi biết về", "giải thích về",
+    "làm thế nào để", "làm sao để", "quy trình",
 }
 
 
