@@ -169,7 +169,7 @@ export function LibraryPage() {
   // Auto-refresh while documents are processing
   useEffect(() => {
     const hasProcessing = documents.some(
-      (d) => d.status === "parsing" || d.status === "indexing" || d.status === "processing"
+      (d) => d.status === "pending" || d.status === "parsing" || d.status === "indexing" || d.status === "processing"
     );
     if (!hasProcessing) return;
     const interval = setInterval(() => refetch(), 3000);

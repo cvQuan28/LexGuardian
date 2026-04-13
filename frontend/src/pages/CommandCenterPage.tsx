@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { CommandBar } from "@/components/command/CommandBar";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { useWorkspaces, useCreateWorkspace } from "@/hooks/useWorkspaces";
+import { useDetectIntent } from "@/hooks/useCommand";
 import { useUploadDocument } from "@/hooks/useDocuments";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { formatDate } from "@/lib/utils";
@@ -20,9 +21,12 @@ export function CommandCenterPage() {
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
   const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
 
+  const detectIntent = useDetectIntent(activeWorkspace?.id ?? workspaces?.[0]?.id ?? null);
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newBriefName, setNewBriefName] = useState("");
   const [commandText, setCommandText] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // File intent modal state
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
@@ -75,10 +79,32 @@ export function CommandCenterPage() {
     }
   }, [activeWorkspace, workspaces, setActiveWorkspace, navigate]);
 
-  /** CommandBar Enter — default to document mode if no text context, else legal */
-  const handleCommandSubmit = useCallback((text: string, files?: File[]) => {
-    handleNavigateWithMode(text, "document", files);
-  }, [handleNavigateWithMode]);
+  /** CommandBar Enter — use intent detection to route smartly */
+  const handleCommandSubmit = useCallback(async (text: string, files?: File[]) => {
+    if (files && files.length > 0) {
+      handleNavigateWithMode(text, "document", files);
+      return;
+    }
+    const ws = activeWorkspace ?? workspaces?.[0];
+    if (!ws) { setShowCreateModal(true); return; }
+
+    setIsProcessing(true);
+    try {
+      const result = await detectIntent.mutateAsync(text);
+      const intent = result.intent;
+      if (intent === "ANALYZE_RISK") {
+        handleNavigateWithMode("", "analyze");
+      } else if (intent === "ASK_LAW" || intent === "CHECK_VALIDITY") {
+        handleNavigateWithMode(text, "legal");
+      } else {
+        handleNavigateWithMode(text, "document");
+      }
+    } catch {
+      handleNavigateWithMode(text, "legal"); // fallback to legal on error
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [activeWorkspace, workspaces, detectIntent, handleNavigateWithMode]);
 
   const handleFileDrop = useCallback((files: File[]) => {
     const ws = activeWorkspace ?? workspaces?.[0];
@@ -142,6 +168,7 @@ export function CommandCenterPage() {
             onChange={setCommandText}
             onSubmit={handleCommandSubmit}
             onFilesDrop={handleFileDrop}
+            isLoading={isProcessing}
             placeholder="Nhập câu hỏi hoặc chọn chế độ bên dưới..."
           />
         </div>

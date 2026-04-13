@@ -18,10 +18,20 @@ function resolveAssistantMode(mode: string | null): "document_qa" | "legal_consu
 
 export function AskPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialQuery = searchParams.get("q") ?? "";
   const urlMode = searchParams.get("mode");
   const assistantMode = resolveAssistantMode(urlMode);
+
+  const toggleMode = useCallback(() => {
+    const next = assistantMode === "legal_consultation" ? "document" : "legal";
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set("mode", next);
+      p.delete("q"); // clear auto-submit so it doesn't re-fire
+      return p;
+    });
+  }, [assistantMode, setSearchParams]);
 
   const wsId = workspaceId ?? "";
   const { data: workspace } = useWorkspace(wsId ? Number(wsId) : null);
@@ -112,7 +122,7 @@ export function AskPage() {
       setMessages((prev) => [...prev, result]);
       stream.reset();
     }
-  }, [stream, messages, enableThinking]);
+  }, [stream, messages, enableThinking, assistantMode]);
 
   const handleCitationClick = useCallback(
     (citation: ChatSourceChunk) => {
@@ -243,6 +253,24 @@ export function AskPage() {
         {/* Input bar */}
         <div className="border-t border-gray-100 bg-white px-4 py-3">
           <div className="flex items-end gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+            {/* Mode toggle */}
+            <button
+              type="button"
+              onClick={toggleMode}
+              title={assistantMode === "legal_consultation" ? "Chế độ: Tư vấn pháp luật — nhấn để đổi sang Hỏi đáp tài liệu" : "Chế độ: Hỏi đáp tài liệu — nhấn để đổi sang Tư vấn pháp luật"}
+              className={cn(
+                "flex-shrink-0 p-1.5 rounded-md transition-colors",
+                assistantMode === "legal_consultation"
+                  ? "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                  : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+              )}
+            >
+              {assistantMode === "legal_consultation"
+                ? <Globe className="w-4 h-4" />
+                : <FileText className="w-4 h-4" />
+              }
+            </button>
+
             {/* Thinking toggle */}
             <button
               type="button"
