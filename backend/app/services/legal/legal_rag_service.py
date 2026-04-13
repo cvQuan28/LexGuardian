@@ -352,6 +352,19 @@ class LegalRAGService:
                 top_k=top_k,
                 document_ids=document_ids,
             )
+            # Auto-fallback: if document_qa returns nothing and caller didn't
+            # pin to specific documents, escalate to consultation + live search.
+            # This covers: (a) docs not yet indexed, (b) general legal questions
+            # that have no matching workspace content.
+            if not legal_result.get("clauses") and not document_ids:
+                logger.info(
+                    "[query_deep] document_qa returned 0 clauses with no doc scope — "
+                    "escalating to legal_consultation with live-search fallback"
+                )
+                legal_result = await self._run_consultation_query_deep(
+                    question=question,
+                    top_k=max(top_k, 8),
+                )
 
         chunks = []
         citations = []
@@ -1020,6 +1033,28 @@ class LegalRAGService:
             static_doc_types=detection.static_doc_types_hint or None,
             static_field_tags=detection.field_tags_hint or None,
         )
+
+        # Live search fallback: if internal retrieval finds nothing AND the
+        # caller didn't restrict to specific document_ids, try Tavily.
+        # This handles both "no indexed docs yet" and "question outside corpus".
+        if not result.get("clauses") and not document_ids:
+            logger.info(
+                "[smart_legal_query] 0 clauses from vector search — "
+                "falling back to live web search for: %s", question[:80]
+            )
+            try:
+                live = await self._build_live_search_legal_result(question, top_k=top_k)
+                live["domain"] = detection.domain
+                live["domain_confidence"] = detection.confidence
+                live["clause_type_filter"] = clause_types
+                live["article_filter"] = articles
+                live["domain_signals"] = detection.signals[:5]
+                live["field_tags_filter"] = detection.field_tags_hint
+                live["static_doc_types_filter"] = detection.static_doc_types_hint
+                live["rewritten_query"] = rewritten_query
+                return live
+            except Exception as exc:
+                logger.warning("[smart_legal_query] live search fallback failed: %s", exc)
 
         result["domain"] = detection.domain
         result["domain_confidence"] = detection.confidence

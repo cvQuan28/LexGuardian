@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { ArrowRight, Loader2, Brain, User, Scale } from "lucide-react";
+import { ArrowRight, Loader2, Brain, Scale, Globe, FileText, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StreamingAnswer } from "@/components/ask/StreamingAnswer";
 import { SourceViewer } from "@/components/ask/SourceViewer";
@@ -10,10 +10,17 @@ import { useWorkspace } from "@/hooks/useWorkspaces";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import type { ChatMessage, ChatSourceChunk } from "@/types";
 
+// Map URL ?mode param → ChatAssistantMode sent to the backend
+function resolveAssistantMode(mode: string | null): "document_qa" | "legal_consultation" {
+  return mode === "legal" ? "legal_consultation" : "document_qa";
+}
+
 export function AskPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const [searchParams] = useSearchParams();
   const initialQuery = searchParams.get("q") ?? "";
+  const urlMode = searchParams.get("mode");
+  const assistantMode = resolveAssistantMode(urlMode);
 
   const wsId = workspaceId ?? "";
   const { data: workspace } = useWorkspace(wsId ? Number(wsId) : null);
@@ -72,12 +79,14 @@ export function AskPage() {
       content: m.content,
     }));
 
-    // Stream response
+    // Stream response — pass assistant_mode derived from URL intent
     const result = await stream.sendMessage(
       trimmed,
       history,
       enableThinking,
-      null,
+      null,       // conversationId
+      false,      // forceSearch
+      assistantMode,
     );
 
     if (result) {
@@ -120,8 +129,22 @@ export function AskPage() {
                 {workspace?.name ?? "LexGuardian"}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                Đặt câu hỏi về tài liệu pháp lý của bạn
+                {assistantMode === "legal_consultation"
+                  ? "Tra cứu pháp luật — tìm kiếm trên các nguồn pháp lý uy tín"
+                  : "Hỏi đáp về tài liệu — câu trả lời dựa trên tài liệu trong Brief"}
               </p>
+              {/* Mode badge */}
+              <div className={cn(
+                "mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border",
+                assistantMode === "legal_consultation"
+                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                  : "bg-gray-50 text-gray-600 border-gray-200"
+              )}>
+                {assistantMode === "legal_consultation"
+                  ? <><Globe className="w-3.5 h-3.5" /> Tra cứu pháp luật trực tuyến</>
+                  : <><FileText className="w-3.5 h-3.5" /> Hỏi đáp từ tài liệu</>
+                }
+              </div>
             </div>
           )}
 

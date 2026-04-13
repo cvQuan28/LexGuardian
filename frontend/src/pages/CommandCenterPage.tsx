@@ -81,9 +81,13 @@ export function CommandCenterPage() {
       const encoded = encodeURIComponent(text);
 
       if (intent === "ANALYZE_RISK") {
-        navigate(`/ask/${ws.id}?q=${encoded}&mode=analyze`);
+        navigate(`/analyze/${ws.id}`);
+      } else if (intent === "ASK_LAW" || intent === "CHECK_VALIDITY") {
+        // Legal research questions → use legal_consultation mode with live search
+        navigate(`/ask/${ws.id}?q=${encoded}&mode=legal`);
       } else {
-        navigate(`/ask/${ws.id}?q=${encoded}`);
+        // ASK_DOCUMENT, GENERAL → document_qa mode (fallback to live if no docs)
+        navigate(`/ask/${ws.id}?q=${encoded}&mode=document`);
       }
     } catch {
       // Fallback: just navigate to ask page
