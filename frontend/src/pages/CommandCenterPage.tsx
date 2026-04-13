@@ -1,23 +1,17 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Scale, FileText, Plus, X, Loader2, Shield, BookOpen, Library } from "lucide-react";
+import { Scale, FileText, Plus, X, Loader2, Shield, BookOpen, Library, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CommandBar } from "@/components/command/CommandBar";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { useWorkspaces, useCreateWorkspace } from "@/hooks/useWorkspaces";
-import { useDetectIntent } from "@/hooks/useCommand";
 import { useUploadDocument } from "@/hooks/useDocuments";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { formatDate } from "@/lib/utils";
 import type { KnowledgeBase } from "@/types";
 
-const SUGGESTIONS = [
-  "Review NDA",
-  "Tra cứu luật đất đai",
-  "Phân tích hợp đồng",
-  "Kiểm tra điều khoản vi phạm",
-];
+type AppMode = "legal" | "document" | "analyze";
 
 export function CommandCenterPage() {
   const navigate = useNavigate();
@@ -25,11 +19,10 @@ export function CommandCenterPage() {
   const { mutateAsync: createWorkspace, isPending: creatingWorkspace } = useCreateWorkspace();
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
   const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
-  const detectIntent = useDetectIntent(activeWorkspace?.id ?? null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newBriefName, setNewBriefName] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [commandText, setCommandText] = useState("");
 
   // File intent modal state
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
@@ -58,44 +51,34 @@ export function CommandCenterPage() {
     }
   }, [newBriefName, createWorkspace, setActiveWorkspace, navigate]);
 
-  const handleCommandSubmit = useCallback(async (text: string, files?: File[]) => {
-    // If no active workspace, use first available or navigate to create one
+  /** Navigate with explicit mode — called from mode cards or command bar Enter */
+  const handleNavigateWithMode = useCallback((text: string, mode: AppMode, files?: File[]) => {
     const ws = activeWorkspace ?? workspaces?.[0];
     if (!ws) {
       setShowCreateModal(true);
       return;
     }
-
     setActiveWorkspace(ws);
 
-    // If files dropped, navigate to library
     if (files && files.length > 0) {
       navigate(`/library/${ws.id}`);
       return;
     }
 
-    setIsProcessing(true);
-    try {
-      const result = await detectIntent.mutateAsync(text);
-      const intent = result.intent;
-      const encoded = encodeURIComponent(text);
-
-      if (intent === "ANALYZE_RISK") {
-        navigate(`/analyze/${ws.id}`);
-      } else if (intent === "ASK_LAW" || intent === "CHECK_VALIDITY") {
-        // Legal research questions → use legal_consultation mode with live search
-        navigate(`/ask/${ws.id}?q=${encoded}&mode=legal`);
-      } else {
-        // ASK_DOCUMENT, GENERAL → document_qa mode (fallback to live if no docs)
-        navigate(`/ask/${ws.id}?q=${encoded}&mode=document`);
-      }
-    } catch {
-      // Fallback: just navigate to ask page
-      navigate(`/ask/${ws.id}?q=${encodeURIComponent(text)}`);
-    } finally {
-      setIsProcessing(false);
+    const encoded = encodeURIComponent(text);
+    if (mode === "analyze") {
+      navigate(`/analyze/${ws.id}`);
+    } else if (mode === "legal") {
+      navigate(`/ask/${ws.id}?q=${encoded}&mode=legal`);
+    } else {
+      navigate(`/ask/${ws.id}?q=${encoded}&mode=document`);
     }
-  }, [activeWorkspace, workspaces, setActiveWorkspace, navigate, detectIntent]);
+  }, [activeWorkspace, workspaces, setActiveWorkspace, navigate]);
+
+  /** CommandBar Enter — default to document mode if no text context, else legal */
+  const handleCommandSubmit = useCallback((text: string, files?: File[]) => {
+    handleNavigateWithMode(text, "document", files);
+  }, [handleNavigateWithMode]);
 
   const handleFileDrop = useCallback((files: File[]) => {
     const ws = activeWorkspace ?? workspaces?.[0];
@@ -155,12 +138,63 @@ export function CommandCenterPage() {
         {/* Command bar */}
         <div className="w-full max-w-2xl">
           <CommandBar
+            value={commandText}
+            onChange={setCommandText}
             onSubmit={handleCommandSubmit}
             onFilesDrop={handleFileDrop}
-            suggestions={SUGGESTIONS}
-            isLoading={isProcessing}
-            placeholder="Hỏi về hợp đồng, tra cứu luật, phân tích rủi ro..."
+            placeholder="Nhập câu hỏi hoặc chọn chế độ bên dưới..."
           />
+        </div>
+
+        {/* 3 Mode Cards */}
+        <div className="w-full max-w-2xl mt-3 grid grid-cols-3 gap-3">
+          {/* Legal consultation */}
+          <button
+            onClick={() => handleNavigateWithMode(commandText || "Tư vấn pháp luật", "legal")}
+            className="group flex flex-col items-start gap-2 p-4 rounded-xl border border-gray-100 bg-white hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-sm transition-all text-left"
+          >
+            <div className="w-8 h-8 rounded-lg bg-blue-100 group-hover:bg-blue-200 flex items-center justify-center transition-colors">
+              <Globe className="w-4 h-4 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Tư vấn pháp luật</p>
+              <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                Tra cứu quy định từ nguồn pháp lý uy tín
+              </p>
+            </div>
+          </button>
+
+          {/* Document QA */}
+          <button
+            onClick={() => handleNavigateWithMode(commandText || "Hỏi đáp tài liệu", "document")}
+            className="group flex flex-col items-start gap-2 p-4 rounded-xl border border-gray-100 bg-white hover:border-emerald-200 hover:bg-emerald-50/50 hover:shadow-sm transition-all text-left"
+          >
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 group-hover:bg-emerald-200 flex items-center justify-center transition-colors">
+              <FileText className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Hỏi đáp tài liệu</p>
+              <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                Đặt câu hỏi về hợp đồng đã tải lên
+              </p>
+            </div>
+          </button>
+
+          {/* Risk analysis */}
+          <button
+            onClick={() => handleNavigateWithMode("", "analyze")}
+            className="group flex flex-col items-start gap-2 p-4 rounded-xl border border-gray-100 bg-white hover:border-orange-200 hover:bg-orange-50/50 hover:shadow-sm transition-all text-left"
+          >
+            <div className="w-8 h-8 rounded-lg bg-orange-100 group-hover:bg-orange-200 flex items-center justify-center transition-colors">
+              <Shield className="w-4 h-4 text-orange-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Phân tích rủi ro</p>
+              <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                Phát hiện điều khoản bất lợi trong hợp đồng
+              </p>
+            </div>
+          </button>
         </div>
 
         {/* Workspace prompt */}

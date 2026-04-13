@@ -9,6 +9,9 @@ interface CommandBarProps {
   isLoading?: boolean;
   placeholder?: string;
   disabled?: boolean;
+  // controlled mode
+  value?: string;
+  onChange?: (v: string) => void;
 }
 
 export function CommandBar({
@@ -18,8 +21,16 @@ export function CommandBar({
   isLoading = false,
   placeholder = "Nhập câu hỏi pháp lý của bạn...",
   disabled = false,
+  value: controlledValue,
+  onChange: onControlledChange,
 }: CommandBarProps) {
-  const [text, setText] = useState("");
+  const isControlled = controlledValue !== undefined;
+  const [internalText, setInternalText] = useState("");
+  const text = isControlled ? controlledValue! : internalText;
+  const setText = (v: string) => {
+    if (isControlled) onControlledChange?.(v);
+    else setInternalText(v);
+  };
   const [isDragOver, setIsDragOver] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);

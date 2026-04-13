@@ -9,7 +9,7 @@ export function useChatHistory(workspaceId: string, conversationId?: number | nu
       api.get<ChatHistoryResponse>(
         `/chat/${workspaceId}/history${conversationId ? `?conversation_id=${conversationId}` : ""}`
       ),
-    enabled: !!workspaceId && !!conversationId,
+    enabled: !!workspaceId,
     staleTime: Infinity, // Don't auto-refetch — we invalidate manually after chat
   });
 }

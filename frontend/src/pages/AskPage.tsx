@@ -7,6 +7,7 @@ import { SourceViewer } from "@/components/ask/SourceViewer";
 import { useLegalStream } from "@/hooks/useLegalStream";
 import { useDocuments } from "@/hooks/useDocuments";
 import { useWorkspace } from "@/hooks/useWorkspaces";
+import { useChatHistory } from "@/hooks/useChatHistory";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import type { ChatMessage, ChatSourceChunk } from "@/types";
 
@@ -32,8 +33,10 @@ export function AskPage() {
   const closeSourceViewer = useWorkspaceStore((s) => s.closeSourceViewer);
 
   const stream = useLegalStream(wsId);
+  const { data: chatHistory } = useChatHistory(wsId);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [inputText, setInputText] = useState("");
   const [enableThinking, setEnableThinking] = useState(false);
   const autoSubmittedRef = useRef(false);
@@ -43,6 +46,22 @@ export function AskPage() {
   useEffect(() => {
     if (workspace) setActiveWorkspace(workspace);
   }, [workspace, setActiveWorkspace]);
+
+  // Load persisted history on first mount (only once per workspace)
+  useEffect(() => {
+    if (historyLoaded || !chatHistory?.messages?.length) return;
+    setHistoryLoaded(true);
+    setMessages(
+      chatHistory.messages.map((m) => ({
+        id: m.message_id,
+        role: m.role,
+        content: m.content,
+        timestamp: m.created_at,
+        sources: m.sources ?? undefined,
+        agentSteps: m.agent_steps ?? undefined,
+      }))
+    );
+  }, [chatHistory, historyLoaded]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {

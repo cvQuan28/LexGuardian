@@ -88,11 +88,12 @@ async def process_document_background(document_id: int, file_path: str, workspac
 @router.post("/upload/{workspace_id}", response_model=DocumentUploadResponse)
 async def upload_document(
     workspace_id: int,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Upload a document to a knowledge base. Processing must be triggered separately."""
+    """Upload a document to a knowledge base and automatically start processing."""
     await get_workspace_for_user(workspace_id, db, current_user)
 
     ext = Path(file.filename).suffix.lower()
@@ -127,11 +128,19 @@ async def upload_document(
     await db.commit()
     await db.refresh(document)
 
+    # Auto-trigger processing immediately after upload
+    background_tasks.add_task(
+        process_document_background,
+        document.id,
+        str(file_path),
+        workspace_id,
+    )
+
     return DocumentUploadResponse(
         id=document.id,
         filename=document.original_filename,
         status=document.status,
-        message="Document uploaded. Click 'Process' to extract and index content."
+        message="Tài liệu đã được tải lên và đang được xử lý."
     )
 
 
