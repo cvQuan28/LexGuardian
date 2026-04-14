@@ -1,54 +1,39 @@
-# NexusRAG — Full Stack (Production)
+# LexGuardian — Full Stack (Production)
 # Usage: cp .env.example .env && docker compose up -d
 
 services:
   postgres:
-    image: postgres:15-alpine
-    container_name: nexusrag-postgres
+    image: pgvector/pgvector:pg15
+    container_name: lexguardian-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: nexusrag
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-lexguardian}
     ports:
       - "5433:5432"
     volumes:
-      - nexusrag_postgres_data:/var/lib/postgresql/data
+      - lexguardian_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-  chromadb:
-    image: chromadb/chroma:latest
-    container_name: nexusrag-chromadb
-    ports:
-      - "8002:8000"
-    volumes:
-      - nexusrag_chroma_data:/chroma/chroma
-    environment:
-      - IS_PERSISTENT=TRUE
-      - ANONYMIZED_TELEMETRY=FALSE
 
   backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: nexusrag-backend
+    container_name: lexguardian-backend
     depends_on:
       postgres:
         condition: service_healthy
-      chromadb:
-        condition: service_started
     env_file: .env
     environment:
-      # Override for Docker internal networking
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/nexusrag
-      CHROMA_HOST: chromadb
-      CHROMA_PORT: 8000
+      # Override for Docker internal networking (takes precedence over .env)
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-lexguardian}
     volumes:
-      - nexusrag_uploads:/app/backend/uploads
-      - nexusrag_data:/app/backend/data
+      - lexguardian_uploads:/app/backend/uploads
+      - lexguardian_data:/app/backend/data
     ports:
       - "8080:8080"
     healthcheck:
@@ -56,14 +41,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 60s
     restart: unless-stopped
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: nexusrag-frontend
+    container_name: lexguardian-frontend
     depends_on:
       backend:
         condition: service_healthy
@@ -72,7 +57,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  nexusrag_postgres_data:
-  nexusrag_chroma_data:
-  nexusrag_uploads:
-  nexusrag_data:
+  lexguardian_postgres_data:
+  lexguardian_uploads:
+  lexguardian_data:

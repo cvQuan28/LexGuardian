@@ -12,6 +12,10 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 import logging
 from logging.handlers import RotatingFileHandler
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from sqlalchemy import text
 
@@ -71,7 +75,7 @@ def setup_logging(debug_mode=True):
     return logger
 
 
-logger = setup_logging(debug_mode=True)
+logger = setup_logging(debug_mode=settings.DEBUG)
 
 
 @asynccontextmanager
@@ -190,10 +194,25 @@ async def lifespan(app: FastAPI):
             logger.error(f"Failed to initialize PGVector tables: {e}")
     else:
         logger.info("AUTO_CREATE_TABLES=false — skipping auto-migration")
+
+    # Warm up embedding model so first query doesn't pay the cold-load penalty (~6s)
+    try:
+        import asyncio as _asyncio
+        from app.services.embedder import get_embedding_service
+        def _warmup():
+            svc = get_embedding_service()
+            svc.embed_query("warmup")
+        await _asyncio.to_thread(_warmup)
+        logger.info("Embedding model warmed up")
+    except Exception as e:
+        logger.warning(f"Embedding warmup failed (non-fatal): {e}")
+
     yield
     logger.info("Shutting down...")
     await engine.dispose()
 
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -204,6 +223,9 @@ app = FastAPI(
     redoc_url="/redoc",
     redirect_slashes=False,
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # CORS
 app.add_middleware(

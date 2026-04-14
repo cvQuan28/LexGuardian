@@ -327,10 +327,23 @@ export function CommandCenterPage() {
         </div>
       )}
 
-      {/* Loading state */}
+      {/* Loading skeleton */}
       {workspacesLoading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-5 h-5 animate-spin text-gray-300" />
+        <div className="px-4 pb-10 max-w-4xl mx-auto w-full">
+          <div className="h-4 w-28 bg-gray-100 rounded mb-4 animate-pulse" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="p-4 rounded-xl border border-gray-100 bg-white animate-pulse">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-gray-100 flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3.5 bg-gray-100 rounded w-3/4" />
+                    <div className="h-3 bg-gray-100 rounded w-1/2" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

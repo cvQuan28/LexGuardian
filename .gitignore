@@ -23,6 +23,7 @@ dist/
 
 # Data & models
 backend/data/
+backend/uploads/
 *.bin
 *.safetensors
 

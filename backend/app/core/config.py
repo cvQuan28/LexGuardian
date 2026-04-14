@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     NEXUSRAG_ENABLE_TABLE_CAPTIONING: bool = True
     NEXUSRAG_MAX_TABLE_MARKDOWN_CHARS: int = 8000
     NEXUSRAG_CHUNK_MAX_TOKENS: int = 512
-    NEXUSRAG_KG_QUERY_TIMEOUT: float = 30.0
+    NEXUSRAG_KG_QUERY_TIMEOUT: float = 8.0
     NEXUSRAG_KG_CHUNK_TOKEN_SIZE: int = 1200
     NEXUSRAG_KG_LANGUAGE: str = "Vietnamese"
     NEXUSRAG_KG_ENTITY_TYPES: list[str] = [
@@ -118,9 +118,11 @@ class Settings(BaseSettings):
     STATIC_LEGAL_DB_PATH: str = "backend/data/static_legal_data"
     STATIC_COLLECTION_NAME: str = "legal_static_global"
 
-    # CORS
+    # CORS — add production domains via CORS_ORIGINS env var (comma-separated)
+    # e.g. CORS_ORIGINS=https://app.lexguardian.vn,https://www.lexguardian.vn
     CORS_ORIGINS: list[str] = [
-        "http://localhost:5174", "http://localhost:3000"]
+        "http://localhost:5174", "http://localhost:3000",
+    ]
 
     model_config = {
         "env_file": str(ENV_FILE),

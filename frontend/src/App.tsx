@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import { useAuthStore } from "@/stores/authStore";
 import { useCurrentUser } from "@/hooks/useAuth";
 import { AppShell } from "@/components/layout/AppShell";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { LoginPage } from "@/pages/LoginPage";
 import { CommandCenterPage } from "@/pages/CommandCenterPage";
 import { AskPage } from "@/pages/AskPage";
@@ -25,54 +26,64 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Toaster position="top-right" richColors />
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/"
-            element={
-              <AuthGate>
-                <AppShell>
-                  <CommandCenterPage />
-                </AppShell>
-              </AuthGate>
-            }
-          />
-          <Route
-            path="/ask/:workspaceId"
-            element={
-              <AuthGate>
-                <AppShell>
-                  <AskPage />
-                </AppShell>
-              </AuthGate>
-            }
-          />
-          <Route
-            path="/analyze/:workspaceId"
-            element={
-              <AuthGate>
-                <AppShell>
-                  <AnalyzePage />
-                </AppShell>
-              </AuthGate>
-            }
-          />
-          <Route
-            path="/library/:workspaceId"
-            element={
-              <AuthGate>
-                <AppShell>
-                  <LibraryPage />
-                </AppShell>
-              </AuthGate>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <Toaster position="top-right" richColors />
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/"
+              element={
+                <AuthGate>
+                  <AppShell>
+                    <ErrorBoundary>
+                      <CommandCenterPage />
+                    </ErrorBoundary>
+                  </AppShell>
+                </AuthGate>
+              }
+            />
+            <Route
+              path="/ask/:workspaceId"
+              element={
+                <AuthGate>
+                  <AppShell>
+                    <ErrorBoundary>
+                      <AskPage />
+                    </ErrorBoundary>
+                  </AppShell>
+                </AuthGate>
+              }
+            />
+            <Route
+              path="/analyze/:workspaceId"
+              element={
+                <AuthGate>
+                  <AppShell>
+                    <ErrorBoundary>
+                      <AnalyzePage />
+                    </ErrorBoundary>
+                  </AppShell>
+                </AuthGate>
+              }
+            />
+            <Route
+              path="/library/:workspaceId"
+              element={
+                <AuthGate>
+                  <AppShell>
+                    <ErrorBoundary>
+                      <LibraryPage />
+                    </ErrorBoundary>
+                  </AppShell>
+                </AuthGate>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

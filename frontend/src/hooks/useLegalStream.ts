@@ -110,12 +110,23 @@ export function useLegalStream(workspaceId: string): LegalStreamResult {
   // Track start time for total duration
   const streamStartRef = useRef(0);
 
-  // Cleanup on unmount
+  // Track mount state to distinguish real unmount from React 18 StrictMode fake unmount
+  const isMountedRef = useRef(false);
+
+  // Cleanup on unmount — deferred via rAF to survive StrictMode's fake unmount cycle
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
-      abortRef.current?.abort();
+      isMountedRef.current = false;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (thinkingRafRef.current) cancelAnimationFrame(thinkingRafRef.current);
+      // Defer abort: if StrictMode immediately remounts, isMountedRef becomes true again
+      // and we skip the abort; on real unmount it stays false and we abort.
+      requestAnimationFrame(() => {
+        if (!isMountedRef.current) {
+          abortRef.current?.abort();
+        }
+      });
     };
   }, []);
 
@@ -308,20 +319,20 @@ export function useLegalStream(workspaceId: string): LegalStreamResult {
                       setStatus("analyzing");
                       syncUpdateSteps((prev) => [
                         ...prev,
-                        createStep("analyzing", detail || "Analyzing your question..."),
+                        createStep("analyzing", detail || "Đang phân tích câu hỏi..."),
                       ]);
                     } else if (step === "retrieving") {
                       setStatus("retrieving");
                       syncUpdateSteps((prev) => [
                         ...completeActiveStep(prev),
-                        createStep("understood", "Understood query", "completed"),
-                        createStep("retrieving", detail || "Searching documents..."),
+                        createStep("understood", "Đã hiểu câu hỏi", "completed"),
+                        createStep("retrieving", detail || "Đang tìm kiếm tài liệu..."),
                       ]);
                     } else if (step === "generating") {
                       setStatus("generating");
                       syncUpdateSteps((prev) => [
                         ...completeActiveStep(prev),
-                        createStep("generating", detail || "Generating answer..."),
+                        createStep("generating", detail || "Đang tạo câu trả lời..."),
                       ]);
                     }
                     break;
@@ -340,7 +351,7 @@ export function useLegalStream(workspaceId: string): LegalStreamResult {
                     const badges = sources.map((s) => String(s.index));
                     syncUpdateSteps((prev) => [
                       ...completeActiveStep(prev),
-                      createStep("sources_found", `Found ${sources.length} source${sources.length > 1 ? "s" : ""}`, "completed"),
+                      createStep("sources_found", `Tìm thấy ${sources.length} nguồn`, "completed"),
                     ].map((s) =>
                       s.step === "sources_found" && s.status === "completed" && !s.sourceBadges
                         ? { ...s, sourceBadges: badges, sourceCount: sources.length }
@@ -424,7 +435,7 @@ export function useLegalStream(workspaceId: string): LegalStreamResult {
                     const totalMs = Date.now() - streamStartRef.current;
                     syncUpdateSteps((prev) => [
                       ...completeActiveStep(prev),
-                      createStep("done", `Done in ${totalMs >= 1000 ? `${(totalMs / 1000).toFixed(1)}s` : `${totalMs}ms`}`, "completed"),
+                      createStep("done", `Hoàn thành trong ${totalMs >= 1000 ? `${(totalMs / 1000).toFixed(1)}s` : `${totalMs}ms`}`, "completed"),
                     ]);
 
                     finalMessage = {
@@ -436,6 +447,7 @@ export function useLegalStream(workspaceId: string): LegalStreamResult {
                       imageRefs: data.image_refs || [],
                       thinking: data.thinking || null,
                       agentSteps: localSteps,
+                      conversationId: data.conversation_id ?? null,
                       timestamp: new Date().toISOString(),
                     };
                     break;

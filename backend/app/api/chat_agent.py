@@ -326,6 +326,7 @@ async def _execute_search_documents(
             source_label=citation.source_file if citation else getattr(chunk, "source_file", ""),
             source_scope=getattr(chunk, "index_scope", "case"),
             source_type="vector",
+            url=getattr(chunk, "canonical_citation", ""),
         ))
         meta_parts = []
         if citation:
@@ -493,7 +494,7 @@ async def agent_chat_stream(
     if force_search:
         # ── Force-search mode: pre-search before LLM call ──────────────────
         # Retrieve sources immediately, inject as context. No tool calling needed.
-        yield {"event": "status", "data": {"step": "retrieving", "detail": f"Searching: {message[:80]}..."}}
+        yield {"event": "status", "data": {"step": "retrieving", "detail": f"Đang tìm: {message[:80]}..."}}
 
         context, sources, images, img_parts = await _execute_search_documents(
             workspace_id,
@@ -553,7 +554,7 @@ async def agent_chat_stream(
             content=messages[-1].content + OLLAMA_TOOL_REMINDER,
         )
 
-    yield {"event": "status", "data": {"step": "analyzing", "detail": "Analyzing your question..."}}
+    yield {"event": "status", "data": {"step": "analyzing", "detail": "Đang phân tích câu hỏi..."}}
 
     accumulated_text = ""
     thinking_text = ""
@@ -600,7 +601,7 @@ async def agent_chat_stream(
 
                 yield {"event": "status", "data": {
                     "step": "retrieving",
-                    "detail": f"Searching: {query[:80]}..."
+                    "detail": f"Đang tìm: {query[:80]}..."
                 }}
 
                 context, sources, images, img_parts = await _execute_search_documents(
@@ -721,7 +722,7 @@ async def agent_chat_stream(
 
                 yield {"event": "status", "data": {
                     "step": "generating",
-                    "detail": "Generating answer..."
+                    "detail": "Đang tạo câu trả lời..."
                 }}
             else:
                 # Unknown tool — treat accumulated text as answer
@@ -741,7 +742,7 @@ async def agent_chat_stream(
         )
         yield {"event": "status", "data": {
             "step": "retrieving",
-            "detail": f"Searching: {message[:80]}..."
+            "detail": f"Đang tìm: {message[:80]}..."
         }}
 
         context, sources, images, img_parts = await _execute_search_documents(
@@ -782,7 +783,7 @@ async def agent_chat_stream(
             fallback_msgs.append(LLMMessage(role="user", content=fallback_content))
 
             yield {"event": "status", "data": {
-                "step": "generating", "detail": "Generating answer..."
+                "step": "generating", "detail": "Đang tạo câu trả lời..."
             }}
 
             async for chunk in provider.astream(
@@ -926,6 +927,9 @@ async def chat_stream_endpoint(
         streaming_images: list[dict] = []
 
         try:
+            # legal_consultation always needs retrieval — skip the tool-decision LLM round-trip
+            effective_force_search = request.force_search or (request.assistant_mode == "legal_consultation")
+
             async for event in agent_chat_stream(
                 workspace_id=workspace_id,
                 message=request.message,
@@ -933,7 +937,7 @@ async def chat_stream_endpoint(
                 enable_thinking=request.enable_thinking,
                 db=db,
                 system_prompt=system_prompt,
-                force_search=request.force_search,
+                force_search=effective_force_search,
                 assistant_mode=request.assistant_mode,
                 document_ids=scoped_document_ids,
             ):
@@ -993,6 +997,7 @@ async def chat_stream_endpoint(
                     final_images = event_data.get("image_refs", [])
                     final_thinking = event_data.get("thinking")
                     final_entities = event_data.get("related_entities", [])
+                    event_data = {**event_data, "conversation_id": conversation.id}
 
                     # Fallback: if sources arrived but generating step was never emitted
                     if streaming_sources and not any(s["step"] == "sources_found" for s in collected_steps):

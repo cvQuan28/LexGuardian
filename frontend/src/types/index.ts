@@ -252,8 +252,9 @@ export interface ChatSourceChunk {
   heading_path: string[];
   score: number;
   source_label?: string;
-  source_scope?: "case" | "static" | string;
+  source_scope?: "case" | "static" | "web" | string;
   source_type?: "vector" | "kg";
+  url?: string;
 }
 
 export interface ChatResponseData {

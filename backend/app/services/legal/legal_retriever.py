@@ -503,12 +503,11 @@ class LegalRetriever:
         )
 
         if not reranked:
-            fallback_k = min(top_k, len(candidates))
             logger.warning(
-                f"Legal reranker filtered all {len(candidates)} candidates, "
-                f"falling back to top-{fallback_k}"
+                f"Legal reranker filtered all {len(candidates)} candidates "
+                f"(min_score={settings.NEXUSRAG_MIN_RELEVANCE_SCORE}) — returning empty"
             )
-            return candidates[:fallback_k]
+            return []
 
         result = []
         for r in reranked:

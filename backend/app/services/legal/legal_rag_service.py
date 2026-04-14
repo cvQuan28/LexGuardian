@@ -38,7 +38,7 @@ from app.services.vector_store import VectorStore, get_vector_store
 from app.services.reranker import get_reranker_service
 from app.services.legal.legal_parser import LegalDocumentParser
 from app.services.legal.clause_chunker import ClauseChunker
-from app.services.legal.legal_kg_service import LegalKGService
+from app.services.legal.legal_kg_service import LegalKGService, get_legal_kg_service
 from app.services.legal.legal_retriever import LegalRetriever
 from app.services.legal.legal_reasoning import LegalReasoningLayer
 from app.services.legal.legal_router import detect_domain
@@ -106,10 +106,10 @@ class LegalRAGService:
             collection_suffix="_legal",
         )
 
-        # Legal KG service
+        # Legal KG service — use per-workspace singleton to avoid re-loading LightRAG
         self.kg_service: Optional[LegalKGService] = None
         if settings.NEXUSRAG_ENABLE_KG:
-            self.kg_service = LegalKGService(workspace_id=workspace_id)
+            self.kg_service = get_legal_kg_service(workspace_id)
 
         # Retriever and reasoning
         # Phase 4: static_index is injected lazily inside LegalRetriever via property
@@ -234,6 +234,8 @@ class LegalRAGService:
         static_statuses: Optional[list[str]] = None,
         static_doc_types: Optional[list[str]] = None,
         static_field_tags: Optional[list[str]] = None,
+        # Performance — skip the LLM reasoning step when caller only needs chunks
+        skip_reasoning: bool = False,
     ) -> dict:
         """
         Answer a legal question with strict grounding.
@@ -280,7 +282,12 @@ class LegalRAGService:
             )
         )
 
-        answer, is_grounded = await self.reasoning.legal_qa(question, retrieval)
+        # Skip LLM reasoning when caller only needs retrieved chunks (e.g. query_deep).
+        # The chat agent runs its own LLM call — doing it here too wastes 15-25s.
+        if skip_reasoning:
+            answer, is_grounded = "", False
+        else:
+            answer, is_grounded = await self.reasoning.legal_qa(question, retrieval)
 
         return {
             "answer": answer,
@@ -347,24 +354,16 @@ class LegalRAGService:
                 top_k=max(top_k, 8),
             )
         else:
-            legal_result = await self.smart_legal_query(
+            # document_qa: restrict to workspace uploaded documents only.
+            # Use CASE_ONLY routing — no static index, no live search.
+            # skip_reasoning=True: chat agent runs its own LLM — don't call it twice.
+            legal_result = await self.legal_query(
                 question=question,
                 top_k=top_k,
                 document_ids=document_ids,
+                routing_mode=RetrievalMode.CASE_ONLY,
+                skip_reasoning=True,
             )
-            # Auto-fallback: if document_qa returns nothing and caller didn't
-            # pin to specific documents, escalate to consultation + live search.
-            # This covers: (a) docs not yet indexed, (b) general legal questions
-            # that have no matching workspace content.
-            if not legal_result.get("clauses") and not document_ids:
-                logger.info(
-                    "[query_deep] document_qa returned 0 clauses with no doc scope — "
-                    "escalating to legal_consultation with live-search fallback"
-                )
-                legal_result = await self._run_consultation_query_deep(
-                    question=question,
-                    top_k=max(top_k, 8),
-                )
 
         chunks = []
         citations = []
@@ -393,6 +392,7 @@ class LegalRAGService:
                 image_refs=[],
                 score=float(item.get("score", 0.0) or 0.0),
                 index_scope=item.get("index_scope", "case"),
+                canonical_citation=item.get("canonical_citation", ""),
             )
             citation = LegalCitation(
                 source_file=source_file,
@@ -447,20 +447,11 @@ class LegalRAGService:
                 static_statuses=static_statuses,
                 static_doc_types=static_doc_types,
                 static_field_tags=static_field_tags,
+                skip_reasoning=True,  # chat agent handles LLM generation
             )
-            if not legal_result.get("clauses"):
-                logger.info(
-                    "[legal_consultation] STATIC_ONLY returned no clauses; retrying MIXED fallback"
-                )
-                legal_result = await self.legal_query(
-                    question=planned_query,
-                    top_k=top_k,
-                    document_ids=None,
-                    routing_mode=RetrievalMode.MIXED,
-                    static_statuses=static_statuses,
-                    static_doc_types=static_doc_types,
-                    static_field_tags=static_field_tags,
-                )
+            # Do NOT fall back to MIXED — that would pull user-uploaded docs into
+            # legal consultation answers, mixing contract content with statutory law.
+            # If static index has nothing, go straight to live search below.
         else:
             legal_result = await self.smart_legal_query(
                 question=question,
@@ -493,50 +484,70 @@ class LegalRAGService:
         comparison_title = self._extract_legal_doc_title(question)
         include_validity = self._should_run_validity_check(question, comparison_title)
 
-        if include_validity and comparison_title:
-            try:
-                validity = await searcher.check_validity(comparison_title)
-                status_label = {
-                    "active": "Còn hiệu lực",
-                    "expired": "Hết hiệu lực",
-                    "unknown": "Chưa rõ hiệu lực",
-                }.get(validity.status, validity.status)
-                validity_text = (
-                    f"Trạng thái hiệu lực: {status_label}.\n"
-                    f"Nhận định: {validity.reasoning}\n"
-                    f"Nguồn: {validity.source_url}\n"
-                    f"Trích đoạn: {validity.source_snippet}"
-                ).strip()
-                clauses.append(
-                    {
-                        "clause_id": f"web-validity:{comparison_title}",
-                        "document_id": 0,
-                        "reference": validity.source_title or comparison_title,
-                        "text": validity_text,
-                        "article": "",
-                        "clause": "",
-                        "point": "",
-                        "page": 0,
-                        "clause_type": "web_validity",
-                        "score": 1.0,
-                        "retrieval_source": "live_search",
-                        "title": validity.source_title or comparison_title,
-                        "document_type": "web_result",
-                        "issuing_authority": validity.source_domain,
-                        "effective_date": "",
-                        "status": validity.status,
-                        "index_scope": "web",
-                        "canonical_citation": validity.source_url or comparison_title,
-                    }
-                )
-            except Exception as exc:
-                logger.warning("Legal consultation validity check failed: %s", exc)
-
-        results = await searcher.search(
+        # Run validity check and main search concurrently when both are needed
+        validity_coro = (
+            searcher.check_validity(comparison_title)
+            if include_validity and comparison_title
+            else None
+        )
+        search_coro = searcher.search(
             query=question,
             max_results=max(3, min(top_k, 8)),
             include_raw_content=True,
         )
+
+        import asyncio as _asyncio
+        if validity_coro is not None:
+            validity_result, search_result = await _asyncio.gather(
+                validity_coro, search_coro, return_exceptions=True
+            )
+        else:
+            validity_result = None
+            search_result = await search_coro
+
+        if validity_result is not None and not isinstance(validity_result, Exception):
+            validity = validity_result
+            status_label = {
+                "active": "Còn hiệu lực",
+                "expired": "Hết hiệu lực",
+                "unknown": "Chưa rõ hiệu lực",
+            }.get(validity.status, validity.status)
+            validity_text = (
+                f"Trạng thái hiệu lực: {status_label}.\n"
+                f"Nhận định: {validity.reasoning}\n"
+                f"Nguồn: {validity.source_url}\n"
+                f"Trích đoạn: {validity.source_snippet}"
+            ).strip()
+            clauses.append(
+                {
+                    "clause_id": f"web-validity:{comparison_title}",
+                    "document_id": 0,
+                    "reference": validity.source_title or comparison_title,
+                    "text": validity_text,
+                    "article": "",
+                    "clause": "",
+                    "point": "",
+                    "page": 0,
+                    "clause_type": "web_validity",
+                    "score": 1.0,
+                    "retrieval_source": "live_search",
+                    "title": validity.source_title or comparison_title,
+                    "document_type": "web_result",
+                    "issuing_authority": validity.source_domain,
+                    "effective_date": "",
+                    "status": validity.status,
+                    "index_scope": "web",
+                    "canonical_citation": validity.source_url or comparison_title,
+                }
+            )
+        elif isinstance(validity_result, Exception):
+            logger.warning("Legal consultation validity check failed: %s", validity_result)
+
+        if isinstance(search_result, Exception):
+            logger.warning("[live_search] Search error: %s", search_result)
+            results = []
+        else:
+            results = search_result
 
         for idx, item in enumerate(results[: max(3, min(top_k, 8))], start=1):
             snippet = item.content or item.raw_content
@@ -1032,6 +1043,7 @@ class LegalRAGService:
             articles=articles,
             static_doc_types=detection.static_doc_types_hint or None,
             static_field_tags=detection.field_tags_hint or None,
+            skip_reasoning=True,  # caller (query_deep) handles LLM generation
         )
 
         # Live search fallback: if internal retrieval finds nothing AND the

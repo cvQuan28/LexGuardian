@@ -20,4 +20,17 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    chunkSizeWarningLimit: 500,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split large vendor libs into separate cacheable chunks
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-state': ['zustand'],
+          'vendor-ui': ['lucide-react', 'clsx', 'tailwind-merge'],
+        },
+      },
+    },
+  },
 })

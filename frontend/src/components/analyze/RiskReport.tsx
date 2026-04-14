@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { AlertCircle, CheckCircle2, Zap } from "lucide-react";
+import { AlertCircle, CheckCircle2, Zap, ShieldCheck } from "lucide-react";
 import { RiskScorecard } from "./RiskScorecard";
 import { RiskItem } from "./RiskItem";
 import type { ContractRiskReport, LegalRiskItem } from "@/types";
@@ -43,6 +43,21 @@ export function RiskReport({ report, onViewClause }: RiskReportProps) {
         partiesIdentified={report.parties_identified}
         governingLaw={report.governing_law}
       />
+
+      {/* Zero-risk success state */}
+      {sortedRisks.length === 0 && (report.missing_clauses ?? []).length === 0 && (
+        <div className="flex flex-col items-center gap-3 py-8 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center">
+            <ShieldCheck className="w-7 h-7 text-emerald-500" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800 mb-1">Hợp đồng không có rủi ro đáng kể</p>
+            <p className="text-xs text-gray-400 max-w-xs leading-relaxed">
+              Hệ thống không phát hiện điều khoản bất lợi nào. Tuy nhiên vẫn nên tham khảo ý kiến chuyên gia pháp lý trước khi ký.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Risk Items */}
       {sortedRisks.length > 0 && (

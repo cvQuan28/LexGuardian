@@ -8,6 +8,7 @@ This module is intended for LIVE_SEARCH flows where the system needs to:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from dataclasses import asdict, dataclass, field
@@ -136,15 +137,19 @@ class LegalWebSearcher:
             f"\"{doc_title}\" \"bị thay thế\"",
             f"\"{doc_title}\" (\"còn hiệu lực\" OR \"hết hiệu lực\" OR \"bị thay thế\" OR \"được thay thế\")",
         ]
+        # Run all 4 searches concurrently instead of sequentially
+        all_results = await asyncio.gather(
+            *[
+                self.search(q, max_results=5, topic="general", include_raw_content=True)
+                for q in search_queries
+            ],
+            return_exceptions=True,
+        )
         results: list[LegalWebSearchResult] = []
         seen_urls: set[str] = set()
-        for query in search_queries:
-            query_results = await self.search(
-                query,
-                max_results=5,
-                topic="general",
-                include_raw_content=True,
-            )
+        for query_results in all_results:
+            if isinstance(query_results, Exception):
+                continue
             for item in query_results:
                 if item.url and item.url not in seen_urls:
                     results.append(item)
@@ -203,11 +208,23 @@ class LegalWebSearcher:
             "Content-Type": "application/json",
         }
 
-        if self._client is not None:
-            response = await self._client.post(TAVILY_SEARCH_URL, json=payload, headers=headers)
-        else:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-                response = await client.post(TAVILY_SEARCH_URL, json=payload, headers=headers)
+        try:
+            if self._client is not None:
+                response = await self._client.post(TAVILY_SEARCH_URL, json=payload, headers=headers)
+            else:
+                async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+                    response = await client.post(TAVILY_SEARCH_URL, json=payload, headers=headers)
+        except httpx.TimeoutException as exc:
+            raise RuntimeError(f"Tavily search timed out after {self.timeout_seconds}s") from exc
+        except httpx.ConnectError as exc:
+            raise RuntimeError("Tavily service unreachable — check network or API endpoint") from exc
+
+        if response.status_code == 401:
+            raise RuntimeError("Tavily API key invalid or expired")
+        if response.status_code == 429:
+            raise RuntimeError("Tavily rate limit exceeded — please retry later")
+        if response.status_code >= 500:
+            raise RuntimeError(f"Tavily server error ({response.status_code}) — service may be down")
 
         response.raise_for_status()
         data = response.json()

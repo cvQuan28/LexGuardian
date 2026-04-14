@@ -49,6 +49,13 @@ export function useRegister() {
   });
 }
 
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (data: { current_password: string; new_password: string }) =>
+      api.post("/auth/change-password", data),
+  });
+}
+
 export function useLogout() {
   const queryClient = useQueryClient();
   const clearSession = useAuthStore((s) => s.clearSession);

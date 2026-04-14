@@ -125,6 +125,13 @@ class LegalKGService:
         )
         self._rag = None
         self._initialized = False
+        self._init_lock: asyncio.Lock | None = None
+
+    def _get_lock(self) -> asyncio.Lock:
+        """Lazily create the asyncio.Lock (requires running event loop)."""
+        if self._init_lock is None:
+            self._init_lock = asyncio.Lock()
+        return self._init_lock
 
     @property
     def _metadata_graph(self) -> LegalMetadataGraph:
@@ -132,60 +139,66 @@ class LegalKGService:
         return get_legal_metadata_graph()
 
     async def _get_rag(self):
-        """Lazy-initialize LightRAG with legal entity types."""
+        """Lazy-initialize LightRAG with legal entity types (thread-safe)."""
         if self._rag is not None and self._initialized:
             return self._rag
 
-        from lightrag import LightRAG
-        from lightrag.utils import wrap_embedding_func_with_attrs
-        from lightrag.kg.shared_storage import initialize_pipeline_status
+        async with self._get_lock():
+            # Double-check inside lock to prevent concurrent duplicate init
+            if self._rag is not None and self._initialized:
+                return self._rag
 
-        os.makedirs(self.working_dir, exist_ok=True)
+            from lightrag import LightRAG
+            from lightrag.utils import wrap_embedding_func_with_attrs
+            from lightrag.kg.shared_storage import initialize_pipeline_status
 
-        emb_provider = get_embedding_provider()
-        embedding_dim = emb_provider.get_dimension()
+            os.makedirs(self.working_dir, exist_ok=True)
 
-        # Dimension mismatch guard
-        dim_marker = Path(self.working_dir) / ".embedding_dim"
-        if dim_marker.exists():
-            prev_dim = int(dim_marker.read_text().strip())
-            if prev_dim != embedding_dim:
-                logger.warning(
-                    f"Legal KG: embedding dimension changed, clearing data "
-                    f"for workspace {self.workspace_id}"
-                )
-                shutil.rmtree(self.working_dir)
-                os.makedirs(self.working_dir, exist_ok=True)
-        dim_marker.write_text(str(embedding_dim))
+            emb_provider = get_embedding_provider()
+            embedding_dim = emb_provider.get_dimension()
 
-        @wrap_embedding_func_with_attrs(embedding_dim=embedding_dim, max_token_size=8192)
-        async def embedding_func(texts: list[str]) -> np.ndarray:
-            return await _legal_kg_embed(texts)
+            # Dimension mismatch guard
+            dim_marker = Path(self.working_dir) / ".embedding_dim"
+            if dim_marker.exists():
+                prev_dim = int(dim_marker.read_text().strip())
+                if prev_dim != embedding_dim:
+                    logger.warning(
+                        f"Legal KG: embedding dimension changed, clearing data "
+                        f"for workspace {self.workspace_id}"
+                    )
+                    shutil.rmtree(self.working_dir)
+                    os.makedirs(self.working_dir, exist_ok=True)
+            dim_marker.write_text(str(embedding_dim))
 
-        self._rag = LightRAG(
-            working_dir=self.working_dir,
-            llm_model_func=_legal_kg_llm_complete,
-            embedding_func=embedding_func,
-            chunk_token_size=settings.NEXUSRAG_KG_CHUNK_TOKEN_SIZE,
-            enable_llm_cache=True,
-            kv_storage="JsonKVStorage",
-            vector_storage="NanoVectorDBStorage",
-            graph_storage="NetworkXStorage",
-            doc_status_storage="JsonDocStatusStorage",
-            addon_params={
-                "language": settings.NEXUSRAG_KG_LANGUAGE,
-                "entity_types": LEGAL_ENTITY_TYPES,
-            },
-        )
+            @wrap_embedding_func_with_attrs(embedding_dim=embedding_dim, max_token_size=8192)
+            async def embedding_func(texts: list[str]) -> np.ndarray:
+                return await _legal_kg_embed(texts)
 
-        await self._rag.initialize_storages()
-        await initialize_pipeline_status()
-        self._initialized = True
+            self._rag = LightRAG(
+                working_dir=self.working_dir,
+                llm_model_func=_legal_kg_llm_complete,
+                embedding_func=embedding_func,
+                chunk_token_size=settings.NEXUSRAG_KG_CHUNK_TOKEN_SIZE,
+                enable_llm_cache=True,
+                kv_storage="JsonKVStorage",
+                vector_storage="NanoVectorDBStorage",
+                graph_storage="NetworkXStorage",
+                doc_status_storage="JsonDocStatusStorage",
+                addon_params={
+                    "language": settings.NEXUSRAG_KG_LANGUAGE,
+                    "entity_types": LEGAL_ENTITY_TYPES,
+                },
+            )
 
-        logger.info(
-            f"LegalKG initialized for workspace {self.workspace_id} "
-            f"(embedding_dim={embedding_dim})"
-        )
+            await self._rag.initialize_storages()
+            await initialize_pipeline_status()
+            self._initialized = True
+
+            logger.info(
+                f"LegalKG initialized for workspace {self.workspace_id} "
+                f"(embedding_dim={embedding_dim})"
+            )
+
         return self._rag
 
     async def ingest(self, text: str) -> None:
@@ -638,3 +651,19 @@ class LegalKGService:
             shutil.rmtree(path)
         self._rag = None
         self._initialized = False
+        # Remove from cache so next access re-creates cleanly
+        _kg_service_cache.pop(self.workspace_id, None)
+
+
+# ---------------------------------------------------------------------------
+# Per-workspace singleton cache — avoids re-loading LightRAG on every request
+# ---------------------------------------------------------------------------
+
+_kg_service_cache: dict[int, LegalKGService] = {}
+
+
+def get_legal_kg_service(workspace_id: int) -> LegalKGService:
+    """Return the cached LegalKGService for this workspace, creating if needed."""
+    if workspace_id not in _kg_service_cache:
+        _kg_service_cache[workspace_id] = LegalKGService(workspace_id=workspace_id)
+    return _kg_service_cache[workspace_id]

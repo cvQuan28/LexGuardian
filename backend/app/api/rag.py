@@ -57,12 +57,12 @@ def _is_legal_mode() -> bool:
 async def _clear_workspace_runtime_data(workspace_id: int) -> None:
     """Clear vector/KG runtime stores before a full workspace reindex."""
     if _is_legal_mode():
-        from app.services.legal.legal_kg_service import LegalKGService
+        from app.services.legal.legal_kg_service import get_legal_kg_service
         from app.services.vector_store import get_vector_store
 
         get_vector_store(workspace_id, collection_suffix="_legal").delete_collection()
         try:
-            LegalKGService(workspace_id).delete_project_data()
+            get_legal_kg_service(workspace_id).delete_project_data()
         except Exception as e:
             logger.warning(f"Failed to delete legal KG data for workspace {workspace_id}: {e}")
         return
@@ -667,8 +667,8 @@ async def get_document_chunks(
 async def _get_kg_service(workspace_id: int):
     """Get the workspace KG service matching the active domain."""
     if _is_legal_mode():
-        from app.services.legal.legal_kg_service import LegalKGService
-        return LegalKGService(workspace_id)
+        from app.services.legal.legal_kg_service import get_legal_kg_service
+        return get_legal_kg_service(workspace_id)
     from app.services.knowledge_graph_service import KnowledgeGraphService
     return KnowledgeGraphService(workspace_id)
 
@@ -1050,6 +1050,7 @@ async def chat_with_documents(
             source_label=citation.source_file if citation else getattr(chunk, "source_file", ""),
             source_scope=getattr(chunk, "index_scope", "case"),
             source_type="vector",
+            url=getattr(chunk, "canonical_citation", ""),
         ))
         # Build metadata line (filename, page, heading) — OUTSIDE brackets
         meta_parts = []

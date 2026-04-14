@@ -7,7 +7,7 @@ export function useChatHistory(workspaceId: string, conversationId?: number | nu
     queryKey: ["chat-history", workspaceId, conversationId ?? "none"],
     queryFn: () =>
       api.get<ChatHistoryResponse>(
-        `/rag/chat/${workspaceId}/history${conversationId ? `?conversation_id=${conversationId}` : ""}`
+        `/chat/${workspaceId}/history${conversationId ? `?conversation_id=${conversationId}` : ""}`
       ),
     enabled: !!workspaceId,
     staleTime: Infinity, // Don't auto-refetch — we invalidate manually after chat
@@ -19,7 +19,7 @@ export function useClearChatHistory(workspaceId: string, conversationId?: number
 
   return useMutation({
     mutationFn: () =>
-      api.delete(`/rag/chat/${workspaceId}/history${conversationId ? `?conversation_id=${conversationId}` : ""}`),
+      api.delete(`/chat/${workspaceId}/history${conversationId ? `?conversation_id=${conversationId}` : ""}`),
     onSuccess: () => {
       queryClient.setQueryData<ChatHistoryResponse>(
         ["chat-history", workspaceId, conversationId ?? "none"],
