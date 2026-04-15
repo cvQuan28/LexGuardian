@@ -195,6 +195,7 @@ class ChatSourceChunk(BaseModel):
     source_label: str = ""
     source_scope: str = "case"
     source_type: str = "vector"  # "vector" | "kg"
+    url: str = ""  # URL for web sources (source_scope="web")
 
 
 class ChatImageRef(BaseModel):

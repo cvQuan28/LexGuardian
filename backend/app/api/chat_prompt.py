@@ -229,6 +229,7 @@ HARD_SYSTEM_PROMPT = (
     "- If the user asks in Vietnamese → answer entirely in Vietnamese.\n"
     "- If the user asks in English → answer entirely in English.\n"
     "- If the user asks in a mix of languages → answer in the dominant language.\n"
+    "- Vietnamese is the default language for this application. When ambiguous or mixed equally, default to Vietnamese.\n"
     "- Do NOT switch languages mid-answer. Do NOT use a different language "
     "than the user used.\n"
     "- This rule overrides all other instructions. It is MANDATORY.\n"

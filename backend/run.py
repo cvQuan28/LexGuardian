@@ -1,6 +1,6 @@
 import subprocess
 import sys
 
-print("Starting NexusRAG backend on port 8080...")
+print("Starting NexusRAG backend on port 8000...")
 subprocess.run([sys.executable, "-m", "uvicorn",
-               "app.main:app", "--reload", "--port", "8080"])
+               "app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"])
